@@ -11,7 +11,7 @@ from typing import Dict, Any
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 # Environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Optional: For webhook mode
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 
 # Validate required variables
@@ -154,11 +153,11 @@ async def time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user's message back."""
+    """Echo the user's message back with smart responses."""
     user_message = update.message.text
     user_name = update.effective_user.first_name or "User"
 
-    # Simple "smart" responses
+    # Smart responses
     smart_responses = {
         "hello": f"Hello {user_name}! 👋 How can I help you today?",
         "hi": f"Hi {user_name}! 👋 Good to see you!",
@@ -167,6 +166,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "help": f"Type /help to see all my commands! 📖",
         "thanks": f"You're welcome, {user_name}! 😊",
         "thank you": f"My pleasure, {user_name}! 😊",
+        "good morning": f"Good morning, {user_name}! ☀️ Have a great day!",
+        "good night": f"Good night, {user_name}! 🌙 Sleep well!",
     }
 
     # Check for smart responses
@@ -234,40 +235,34 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """Main function to run the bot."""
-    # Create application
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # Add command handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("ping", ping))
-    application.add_handler(CommandHandler("info", info_command))
-    application.add_handler(CommandHandler("time", time_command))
-    application.add_handler(CommandHandler("echo", echo))
-
-    # Add callback query handler
-    application.add_handler(CallbackQueryHandler(button_callback))
-
-    # Add message handler for non-command messages
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-
-    # Add error handler
-    application.add_error_handler(error_handler)
-
-    # Determine deployment mode
-    if WEBHOOK_URL:
-        # Webhook mode (production on Railway)
-        logger.info(f"🌐 Running in WEBHOOK mode on port {PORT}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=BOT_TOKEN,
-            webhook_url=WEBHOOK_URL + "/" + BOT_TOKEN,
-        )
-    else:
-        # Polling mode (development or fallback)
-        logger.info("📡 Running in POLLING mode")
-        application.run_polling()
+    try:
+        # Create application using the correct builder pattern for Python 3.13
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Add command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("ping", ping))
+        application.add_handler(CommandHandler("info", info_command))
+        application.add_handler(CommandHandler("time", time_command))
+        application.add_handler(CommandHandler("echo", echo))
+        
+        # Add callback query handler
+        application.add_handler(CallbackQueryHandler(button_callback))
+        
+        # Add message handler for non-command messages
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+        
+        # Add error handler
+        application.add_error_handler(error_handler)
+        
+        # Start the bot using polling
+        logger.info("📡 Bot is starting in POLLING mode...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
